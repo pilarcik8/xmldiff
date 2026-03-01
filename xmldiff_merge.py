@@ -48,8 +48,7 @@ def merge_three_way(base_path, left_path, right_path, result_path):
 
 def main():
     DirWithFiles = user_input_dir_to_files()
-    result_dir = os.path.join(DirWithFiles, "results")
-
+    result_dir = os.path.join(DirWithFiles, "xmldiff")
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
 
@@ -86,6 +85,7 @@ def main():
 
         try:
             merge_three_way(base_path, left_path, right_path, result_path)
+            print(f"Iterácia {iteration} zmergovaná úspešne.")
         except Exception as ex:
             print(f"Chyba pri mergovaní v iterácii {iteration}: {ex}")
             errored_files.append(iteration)
