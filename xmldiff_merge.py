@@ -81,6 +81,14 @@ def main():
                 conflict_percent = (len(errored_files) * 100.0) / iteration
                 print(f"{conflict_percent:.2f}% konfliktov")
 
+            if len(errored_files) > 0:
+                error_file_path = os.path.join(result_dir, "xmlDiffErrors.txt")
+                with open(error_file_path, "w", encoding="utf-8") as f:
+                    for item in errored_files:
+                        f.write(f"{item}\n")
+
+                print(f"Zoznam chýb uložený do: {error_file_path}")
+
             break
 
         try:
