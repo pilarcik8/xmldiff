@@ -66,7 +66,7 @@ def main():
                 os.path.isfile(left_path) and
                 os.path.isfile(right_path)):
 
-            print(f"Ended at iteration: {iteration}")
+            print(f"Ukončené na iterácii: {iteration}")
 
             if iteration == 0:
                 print("Nenájdený žiadny súbor na spracovanie.")
@@ -75,11 +75,9 @@ def main():
 
                 if errored_files:
                     print("Chybné iterácie:", ", ".join(map(str, errored_files)))
-                else:
-                    print("None")
 
                 conflict_percent = (len(errored_files) * 100.0) / iteration
-                print(f"{conflict_percent:.2f}% konfliktov")
+                print(f"{conflict_percent:.2f}% chybne spracovaných iterací.")
 
             if len(errored_files) > 0:
                 error_file_path = os.path.join(result_dir, "xmlDiffErrors.txt")
