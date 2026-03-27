@@ -40,8 +40,12 @@ def merge_three_way(base_path, left_path, right_path, result_path):
     diff_right = xmldiff_main.diff_trees(base_tree, right_tree)
 
     patcher = patch.Patcher()
-    merged_root = patcher.patch(diff_left, base_tree)
-    merged_root = patcher.patch(diff_right, merged_root)
+    try:
+        merged_root = patcher.patch(diff_left, base_tree)
+        merged_root = patcher.patch(diff_right, merged_root)
+    except Exception as ex:
+        merged_root = patcher.patch(diff_right, base_tree)
+        merged_root = patcher.patch(diff_left, merged_root)    
 
     save_xml(etree.ElementTree(merged_root), result_path)
 
