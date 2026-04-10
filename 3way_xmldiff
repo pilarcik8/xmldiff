@@ -31,21 +31,6 @@ def save_xml(tree, full_path):
     tree.write(full_path, pretty_print=True, encoding="utf-8", xml_declaration=True)
 
 
-def ask_should_write_scripts():
-    print("Chcete zapisovať edit scripty každej iterácie do scripts.txt? (a/n)")
-
-    while True:
-        answer = input().strip().lower()
-
-        if answer == "a":
-            return True
-
-        if answer == "n":
-            return False
-
-        print("Prosím zadajte 'a' pre áno alebo 'n' pre nie:")
-
-
 def write_iteration_scripts(scripts_path, iteration, diff_left, diff_right):
     # Súbor sa priebežne dopĺňa, aby zostal zachovaný výstup zo všetkých iterácií.
     with open(scripts_path, "a", encoding="utf-8") as file:
@@ -138,14 +123,25 @@ def merge_three_way(base_path, left_path, right_path, result_path, scripts_path=
         write_iteration_scripts(scripts_path, iteration, diff_left, diff_right)
 
     patcher = patch.Patcher()
+    merge_errors = []
     try:
         # Preferované poradie: najprv LEFT zmeny, potom RIGHT zmeny.
         merged_root = patcher.patch(diff_left, base_tree)
         merged_root = patcher.patch(diff_right, merged_root)
-    except Exception as ex:
+    except Exception as first_ex:
+        merge_errors.append(("LEFT->RIGHT", str(first_ex)))
         # Pri konflikte skúšame opačné poradie aplikovania patchov.
-        merged_root = patcher.patch(diff_right, base_tree)
-        merged_root = patcher.patch(diff_left, merged_root)    
+        try:
+            merged_root = patcher.patch(diff_right, base_tree)
+            merged_root = patcher.patch(diff_left, merged_root)
+        except Exception as second_ex:
+            merge_errors.append(("RIGHT->LEFT", str(second_ex)))
+            merge_error = RuntimeError(
+                "Nepodarilo sa aplikovať patch ani v jednom poradí. "
+                f"LEFT->RIGHT chyba: {first_ex}; RIGHT->LEFT chyba: {second_ex}"
+            )
+            merge_error.merge_errors = merge_errors
+            raise merge_error from second_ex
 
     if iteration is not None:
         trees_path = os.path.join(os.path.dirname(result_path), "merged_trees.txt")
@@ -159,11 +155,11 @@ def merge_three_way(base_path, left_path, right_path, result_path, scripts_path=
         )
 
     save_xml(etree.ElementTree(merged_root), result_path)
+    return merge_errors
 
 
 def main():
     DirWithFiles = user_input_dir_to_files()
-    should_write_scripts = ask_should_write_scripts()
     result_dir = os.path.join(DirWithFiles, "xmldiff")
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
@@ -172,14 +168,13 @@ def main():
     with open(trees_path, "w", encoding="utf-8") as file:
         file.write("Výpis XML stromov podľa iterácií\n\n")
 
-    scripts_path = None
-    if should_write_scripts:
-        scripts_path = os.path.join(result_dir, "scripts.txt")
-        with open(scripts_path, "w", encoding="utf-8") as file:
-            file.write("Edit scripty podľa iterácií\n\n")
+    scripts_path = os.path.join(result_dir, "scripts.txt")
+    with open(scripts_path, "w", encoding="utf-8") as file:
+        file.write("Edit scripty podľa iterácií\n\n")
 
     iteration = 0
     errored_files = []
+    errored_details = []
 
     while True:
 
@@ -208,18 +203,47 @@ def main():
                 conflict_percent = (len(errored_files) * 100.0) / iteration
                 print(f"{conflict_percent:.2f}% chybne spracovaných iterací.")
 
-            if len(errored_files) > 0:
+            if len(errored_details) > 0:
                 error_file_path = os.path.join(result_dir, "xmlDiffErrors.txt")
                 with open(error_file_path, "w", encoding="utf-8") as f:
-                    for item in errored_files:
-                        f.write(f"{item}\n")
+                    errors_by_iteration = {}
+                    for item_iteration, item_order, item_error in errored_details:
+                        if item_iteration not in errors_by_iteration:
+                            errors_by_iteration[item_iteration] = {
+                                "LEFT->RIGHT": [],
+                                "RIGHT->LEFT": [],
+                            }
+
+                        if item_order in errors_by_iteration[item_iteration]:
+                            errors_by_iteration[item_iteration][item_order].append(item_error)
+
+                    for item_iteration in sorted(errors_by_iteration):
+                        left_errors = errors_by_iteration[item_iteration]["LEFT->RIGHT"]
+                        right_errors = errors_by_iteration[item_iteration]["RIGHT->LEFT"]
+
+                        f.write(f"Iterácia {item_iteration}:\n")
+                        f.write("Left->right:\n")
+                        if left_errors:
+                            for item_error in left_errors:
+                                f.write(f"{item_error}\n")
+                        else:
+                            f.write("(bez chyby)\n")
+
+                        f.write("Right->Left:\n")
+                        if right_errors:
+                            for item_error in right_errors:
+                                f.write(f"{item_error}\n")
+                        else:
+                            f.write("(bez chyby)\n")
+
+                        f.write("\n")
 
                 print(f"Zoznam chýb uložený do: {error_file_path}")
 
             break
 
         try:
-            merge_three_way(
+            iteration_merge_errors = merge_three_way(
                 base_path,
                 left_path,
                 right_path,
@@ -227,10 +251,18 @@ def main():
                 scripts_path=scripts_path,
                 iteration=iteration,
             )
+            for item_order, item_error in iteration_merge_errors:
+                errored_details.append((iteration, item_order, item_error))
             print(f"Iterácia {iteration} spojená úspešne.")
         except Exception as ex:
             print(f"Chyba pri mergovaní v iterácii {iteration}: {ex}")
             errored_files.append(iteration)
+            exception_merge_errors = getattr(ex, "merge_errors", None)
+            if exception_merge_errors:
+                for item_order, item_error in exception_merge_errors:
+                    errored_details.append((iteration, item_order, item_error))
+            else:
+                errored_details.append((iteration, "UNKNOWN", str(ex)))
 
         iteration += 1
 
