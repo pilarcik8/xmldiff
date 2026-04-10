@@ -27,7 +27,11 @@ class Patcher:
         result = deepcopy(tree)
 
         for action in actions:
-            self.handle_action(action, result)
+            # Pridane pre lepsie vypisi chyb
+            try:
+                self.handle_action(action, result)
+            except Exception as ex:
+                raise Exception(f"Error applying action {action}") from ex
 
         return result
 
