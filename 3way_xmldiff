@@ -164,10 +164,6 @@ def main():
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
 
-    trees_path = os.path.join(result_dir, "trees.txt")
-    with open(trees_path, "w", encoding="utf-8") as file:
-        file.write("Výpis XML stromov podľa iterácií\n\n")
-
     scripts_path = os.path.join(result_dir, "scripts.txt")
     with open(scripts_path, "w", encoding="utf-8") as file:
         file.write("Edit scripty podľa iterácií\n\n")
