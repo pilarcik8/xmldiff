@@ -27,7 +27,7 @@ class Patcher:
         result = deepcopy(tree)
 
         for action in actions:
-            # Pridane pre lepsie vypisi chyb
+            # Pridaný try-except pre lepšie výpisy chýb
             try:
                 self.handle_action(action, result)
             except Exception as ex:
